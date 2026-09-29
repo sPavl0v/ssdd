@@ -1,0 +1,54 @@
+{
+  "name": "ssdd",
+  "version": "0.1.0",
+  "description": "Simple spec-driven development CLI",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ssdd": "bin/ssdd.cjs"
+  },
+  "files": [
+    "bin",
+    "schema"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "embed": "node scripts/embed-assets.mjs",
+    "dev": "npm run embed && bun src/cli/main.ts",
+    "typecheck": "npm run embed && tsc --noEmit",
+    "test": "npm run embed && vitest run",
+    "build": "npm run embed && bun build src/cli/main.ts --compile --minify --outfile dist/ssdd",
+    "build:all": "npm run embed && bun scripts/build-all.ts",
+    "build:wheels": "bun scripts/build-wheels.ts",
+    "schema": "npm run embed && bun scripts/gen-schema.ts",
+    "formula": "bun scripts/formula.ts"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "fast-glob": "^3.3.3",
+    "fast-xml-parser": "^5.11.2",
+    "fastest-levenshtein": "^1.0.16",
+    "picocolors": "^1.1.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "bun": "^1.4.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<org>/ssdd"
+  },
+  "optionalDependencies": {
+    "ssdd-linux-x64": "0.1.0",
+    "ssdd-linux-arm64": "0.1.0",
+    "ssdd-darwin-x64": "0.1.0",
+    "ssdd-darwin-arm64": "0.1.0",
+    "ssdd-win32-x64": "0.1.0"
+  }
+}

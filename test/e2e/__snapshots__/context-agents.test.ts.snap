@@ -1,0 +1,496 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`agents > renders claude commands 1`] = `
+{
+  ".claude/commands/ssdd-commit.md": "---
+description: "Bump the ssdd spec version, commit everything, tag and push"
+argument-hint: "<commit message>"
+---
+You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: $ARGUMENTS
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+",
+  ".claude/commands/ssdd-implement.md": "---
+description: "Implement what changed in the ssdd spec since the last ssdd commit"
+argument-hint: "[path, e.g. 1.a.3] [--no-test]"
+---
+You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+",
+  ".claude/commands/ssdd-test.md": "---
+description: "Write and run the ssdd-tagged tests for a spec subtree"
+argument-hint: "[path, e.g. 1.a.3]"
+---
+You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+",
+}
+`;
+
+exports[`agents > renders codex commands 1`] = `
+{
+  "~/.codex/prompts/ssdd-commit.md": "---
+description: "Bump the ssdd spec version, commit everything, tag and push"
+argument-hint: "<commit message>"
+---
+You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: $ARGUMENTS
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+",
+  "~/.codex/prompts/ssdd-implement.md": "---
+description: "Implement what changed in the ssdd spec since the last ssdd commit"
+argument-hint: "[path, e.g. 1.a.3] [--no-test]"
+---
+You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+",
+  "~/.codex/prompts/ssdd-test.md": "---
+description: "Write and run the ssdd-tagged tests for a spec subtree"
+argument-hint: "[path, e.g. 1.a.3]"
+---
+You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+",
+}
+`;
+
+exports[`agents > renders copilot commands 1`] = `
+{
+  ".github/prompts/ssdd-commit.prompt.md": "---
+agent: "agent"
+description: "Bump the ssdd spec version, commit everything, tag and push"
+argument-hint: "<commit message>"
+---
+You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: \${input:args}
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+",
+  ".github/prompts/ssdd-implement.prompt.md": "---
+agent: "agent"
+description: "Implement what changed in the ssdd spec since the last ssdd commit"
+argument-hint: "[path, e.g. 1.a.3] [--no-test]"
+---
+You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: \${input:args}
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+",
+  ".github/prompts/ssdd-test.prompt.md": "---
+agent: "agent"
+description: "Write and run the ssdd-tagged tests for a spec subtree"
+argument-hint: "[path, e.g. 1.a.3]"
+---
+You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: \${input:args}
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+",
+}
+`;
+
+exports[`agents > renders cursor commands 1`] = `
+{
+  ".cursor/commands/ssdd-commit.md": "You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: the text typed after the command (may be empty)
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+",
+  ".cursor/commands/ssdd-implement.md": "You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: the text typed after the command (may be empty)
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+",
+  ".cursor/commands/ssdd-test.md": "You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: the text typed after the command (may be empty)
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+",
+}
+`;
+
+exports[`agents > renders gemini commands 1`] = `
+{
+  ".gemini/commands/ssdd-commit.toml": "description = "Bump the ssdd spec version, commit everything, tag and push"
+prompt = '''
+You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: {{args}}
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+'''
+",
+  ".gemini/commands/ssdd-implement.toml": "description = "Implement what changed in the ssdd spec since the last ssdd commit"
+prompt = '''
+You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: {{args}}
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+'''
+",
+  ".gemini/commands/ssdd-test.toml": "description = "Write and run the ssdd-tagged tests for a spec subtree"
+prompt = '''
+You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: {{args}}
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+'''
+",
+}
+`;
+
+exports[`agents > renders opencode commands 1`] = `
+{
+  ".opencode/command/ssdd-commit.md": "---
+description: "Bump the ssdd spec version, commit everything, tag and push"
+---
+You are committing a new ssdd spec version. This is deterministic: make no code changes.
+
+Message: $ARGUMENTS
+
+1. Empty message → reply "Pass a message, e.g. the one /ssdd-implement printed" and stop.
+2. Write the message verbatim to a temporary file outside the repo and run
+   \`ssdd commit -F <file>\` (a file avoids shell quoting of multi-line messages).
+3. Show the CLI output: version, commit hash, branch, push result.
+   Push failed → show the git error and suggest \`git pull --rebase\`, then \`git push --follow-tags\`.
+   Spec errors → show them and stop.
+",
+  ".opencode/command/ssdd-implement.md": "---
+description: "Implement what changed in the ssdd spec since the last ssdd commit"
+---
+You are implementing this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <arguments> --for implement\`, passing the arguments above as given
+   (path and/or --no-test; none is fine), and read the whole output.
+   Invalid path → show the message and stop. No changes → reply "No spec changes since v<N>" and stop.
+2. Scope = the Changes, or the whole Target when a path was given (audit it against the code).
+   Breadcrumb is context; Boundaries are out of scope.
+3. Per change root: added → build from scratch; modified or moved → update the
+   code to the new text, unchanged children must keep working; removed → delete its behavior,
+   code and orphaned tests unless another node still uses them. Keep code that already
+   satisfies a node. Constitution or tech stack changed → no codebase-wide refactor; list
+   affected areas under Suggested follow-ups.
+4. Implement depth first. Each leaf is an acceptance criterion; parent titles and bodies
+   describe grouping and shared behavior.
+5. Follow the Constitution and Tech stack. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+6. Ambiguous node → choose the reading most consistent with the spec and note it under
+   Assumptions, with ready-to-paste bullets under Suggested spec changes.
+   Conflict with the Constitution or Tech stack → stop and report.
+7. Run build, type check and lint from the Tech stack and fix what fails.
+8. If the output lists Test scopes, follow the /ssdd-test steps
+   for each Test scope in the output: write missing tests, rewrite stale ones, delete orphaned
+   ones, tag each test \`[ssdd:<path>@v<pending version>#<fp>]\` using the fingerprints the context
+   prints, then run \`ssdd test <scope>\`.
+9. Reply with: a table (path, change, action: built / updated / removed / audited, status,
+   main files), the test report per scope, then Assumptions, Suggested spec changes,
+   Out-of-scope changes, Suggested follow-ups.
+10. End with a commit message in a code block, in the Commits format from the
+    Constitution (default: Conventional Commits, \`<type>(<scope>): <summary>\` of at most
+    72 characters; body = one bullet per change root with its path and title; no version),
+    and the line "Run /ssdd-commit with this message, as is or edited."
+",
+  ".opencode/command/ssdd-test.md": "---
+description: "Write and run the ssdd-tagged tests for a spec subtree"
+---
+You are writing and running tests for this project's spec. The spec tree is the source of truth.
+
+Arguments: $ARGUMENTS
+
+1. Run \`ssdd context <path> --for test\` with the path above (none = whole tree)
+   and read the whole output. Invalid path → show the message and stop.
+2. Per leaf in the Tests section: missing → write a test; stale → rewrite the test against the
+   current node text; current → keep it. Delete orphaned tests in scope.
+3. Pick the test layer per the Tech stack (unit, integration, e2e). UI states usually need e2e.
+4. Tag rules: every test carries exactly one tag, \`[ssdd:<path>@v<pending version>#<fp>]\`, with the
+   leaf's path and fingerprint as printed in the Tests section. Put it in the test name, or, for a
+   runner configured with \`"tagStyle": "comment"\`, in a comment on the line directly above the test
+   definition. A leaf may have several tests.
+5. A leaf that cannot be automated gets a skipped test with its tag and a one-line reason.
+6. Run \`ssdd test <path>\`; it prints the report.
+7. On failure, check whether the test contradicts the node. If so, fix the test and rerun
+   (at most 2 rounds). Never change application code here. Never edit files under ssdd/.
+   Never run git commit, tag or push.
+8. Summary: failing leaves with a one-line cause each, and suggest \`/ssdd-implement <path>\`
+   for them. If test files changed, end with a commit message in a code block
+   (Commits format from the Constitution; default \`test(<scope>): <summary>\`) and the line
+   "Run /ssdd-commit with this message, as is or edited."
+",
+}
+`;

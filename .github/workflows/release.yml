@@ -1,0 +1,97 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+  id-token: write # PyPI trusted publishing and npm provenance
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
+      - run: npm ci
+      - run: npm run build:all
+      - run: npm run build:wheels
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: dist }
+
+  smoke:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, file: ssdd-linux-x64, wheel: manylinux_2_17_x86_64 }
+          - { os: ubuntu-24.04-arm, file: ssdd-linux-arm64, wheel: manylinux_2_17_aarch64 }
+          - { os: macos-13, file: ssdd-darwin-x64, wheel: macosx_10_15_x86_64 }
+          - { os: macos-latest, file: ssdd-darwin-arm64, wheel: macosx_11_0_arm64 }
+          - { os: windows-latest, file: ssdd-windows-x64.exe, wheel: win_amd64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      # No Node setup: the binary must run on its own. End-to-end: init, commit v1, edit, diff, commit v2 to a bare remote.
+      - shell: bash
+        run: |
+          set -eux
+          B="$PWD/dist/${{ matrix.file }}"; chmod +x "$B"
+          "$B" --version
+          git config --global user.email ci@example.com; git config --global user.name ci
+          git init -q --bare remote.git
+          mkdir app && cd app && git init -q -b main && git remote add origin ../remote.git
+          "$B" init
+          "$B" commit -m "chore(ssdd): initialize ssdd spec"
+          printf -- '---\nssdd: 1\nversion: 1\n---\n# Login\n\n- Login form\n  - Shows email field\n' > ssdd/rootspec.md
+          "$B" diff
+          "$B" check
+          "$B" commit -m "feat(login): login form"
+          git -C ../remote.git tag -l | grep -x ssdd-v2
+      - uses: astral-sh/setup-uv@v5
+      - name: wheel installs with uv
+        shell: bash
+        run: |
+          uv tool install dist/wheels/ssdd-*-py3-none-${{ matrix.wheel }}.whl
+          ssdd --version
+
+  publish:
+    needs: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
+      - uses: oven-sh/setup-bun@v2
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      - name: GitHub release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release create "$GITHUB_REF_NAME" dist/ssdd-* dist/SHA256SUMS dist/wheels/*.whl --generate-notes
+      - name: npm
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
+        run: |
+          for d in dist/npm/*/; do npm publish "$d" --access public --provenance; done
+          npm publish --access public --provenance
+      - name: PyPI
+        run: uv publish dist/wheels/*.whl
+
+  homebrew:
+    needs: publish
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      - name: Render and test the formula, then push it to the tap
+        env: { TAP_TOKEN: "${{ secrets.HOMEBREW_TAP_TOKEN }}" }
+        run: |
+          mkdir -p Formula
+          bun scripts/formula.ts "${GITHUB_REPOSITORY_OWNER}" > Formula/ssdd.rb
+          brew install --formula ./Formula/ssdd.rb
+          brew test ssdd
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/homebrew-tap.git" tap
+          mkdir -p tap/Formula && cp Formula/ssdd.rb tap/Formula/ssdd.rb
+          cd tap && git add Formula/ssdd.rb && git -c user.name=ssdd-release -c user.email=release@users.noreply.github.com commit -m "ssdd ${GITHUB_REF_NAME}" && git push
