@@ -1,26 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
-import { CliError } from "../config.ts";
+import { CliError, SpecErrors } from "../config.ts";
 import type { Project } from "../project.ts";
 import { agentBody, stripComments } from "../spec/hash.ts";
-import { SSDD_DIR, emptySource, featureFile, findNode, isLeaf, leaves, loadTree, PathError } from "../spec/tree.ts";
-import type { Diagnostic, SpecNode, SpecTree } from "../spec/types.ts";
-import { formatTag, nodeFingerprint, tagState, type TestTag } from "../tests/tags.ts";
-import { indexTree } from "../spec/tree.ts";
-import { findBaseline } from "../version/baseline.ts";
-import { type Change, type ChangeSet, changePath, computeChanges, filterChanges, isEmpty, nodeText, testScopes } from "../version/changes.ts";
+import { SSDD_DIR, emptySource, featureFile, findNode, loadTree, PathError } from "../spec/tree.ts";
+import type { SpecNode, SpecTree } from "../spec/types.ts";
+import { findBaselines } from "../version/baseline.ts";
+import { type Change, type ChangeSet, changePath, computeChanges, filterChanges, intersectChanges, isEmpty, nodeText } from "../version/changes.ts";
 import { gitSource, readAt } from "../version/git.ts";
 import { sync } from "../version/sync.ts";
 
-export type Mode = "implement" | "test";
-
-export class SpecErrors extends CliError {
-  constructor(public diagnostics: Diagnostic[]) {
-    super("Spec has errors; fix them first (ssdd check lists them)", 1);
-  }
-}
+export type Mode = "implement" | "test" | "specify";
 
 const CONTEXT_FILES = ["constitution.md", "techstack.md"];
+const MEMORY_FILE = "memory.md";
+
+/** Memory without comments and headings; empty when only the template skeleton is left. */
+function memoryText(root: string): string {
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(root, SSDD_DIR, MEMORY_FILE), "utf8");
+  } catch {}
+  const facts = stripComments(text)
+    .split("\n")
+    .filter((l) => l.trim() && !/^#{1,6}\s/.test(l.trim()));
+  return facts.length ? demoteHeadings(stripComments(text).trim()) : "";
+}
 
 function title(n: SpecNode): string {
   return stripComments(n.title).trim();
@@ -96,29 +101,25 @@ function describeChange(c: Change): string[] {
   return out;
 }
 
-function leafLines(tree: SpecTree, scopeNodes: SpecNode[], tags: TestTag[], pending: number, withTests: boolean): string[] {
-  const index = indexTree(tree);
-  const out: string[] = [];
-  for (const l of leaves(scopeNodes)) {
-    const tag = formatTag(l.path, pending, nodeFingerprint(l));
-    if (!withTests) {
-      out.push(`- [${l.path}] ${title(l)} — tag \`${tag}\``);
-      continue;
-    }
-    const mine = tags.filter((t) => t.path === l.path);
-    const state = mine.length ? mine.map((t) => `${t.file}:${t.line} ${tagState(t, index)}`).join("; ") : "missing";
-    out.push(`- [${l.path}] ${title(l)} — tag \`${tag}\` — tests: ${state}`);
+/** Top-level features whose tests must run for these changes, in tree order. */
+function featuresOf(tree: SpecTree, changes: ChangeSet, target: SpecNode | null): SpecNode[] {
+  const features = new Set<SpecNode>();
+  if (target) features.add(topLevel(target));
+  for (const g of changes.groups) {
+    // A removed change root sits under an unchanged parent (or is itself top level).
+    const parent = g.root.oldNode?.parent;
+    const n = g.root.newNode ?? (parent ? changes.mapping.oldToNew.get(parent)?.node : undefined);
+    if (n) features.add(topLevel(n));
   }
-  return out;
+  return tree.roots.filter((r) => features.has(r));
 }
 
 export interface ContextOptions {
   path?: string;
   mode: Mode;
-  noTest?: boolean;
 }
 
-export function buildContext(p: Project, opts: ContextOptions): { text: string; empty: boolean } {
+export function buildContext(p: Project, opts: ContextOptions): string {
   const s = sync(p);
   const tree = s.tree;
   const errors = tree.diagnostics.filter((d) => d.level === "error");
@@ -134,14 +135,15 @@ export function buildContext(p: Project, opts: ContextOptions): { text: string; 
     }
   }
 
-  const baseline = findBaseline(p.root, p.config.git.tagPrefix);
+  const baselines = findBaselines(p.root);
+  const since = baselines.length ? Math.max(...baselines.map((b) => b.version)) : tree.version;
   const out: string[] = [];
   out.push(`# ssdd context · ${opts.mode}`, "");
   out.push(`- Spec version: v${tree.version}`);
-  out.push(`- Pending version: v${pending} (use it in new test tags)`);
-  out.push(`- Baseline: ${baseline ? `${baseline.rev} (${baseline.commit.slice(0, 7)})` : "none (every node counts as added)"}`);
-  out.push(`- Target: ${target ? `[${target.path}] ${title(target)}` : "whole tree"}`);
-  out.push(`- Command: ${opts.mode}`, "");
+  out.push(`- Pending version: v${pending}`);
+  const baselineText = baselines.map((b) => `v${b.version} (${b.commit.slice(0, 7)})`).join(" + ");
+  out.push(`- Baseline: ${baselineText || "none (every node counts as added)"}`);
+  out.push(`- Target: ${target ? `[${target.path}] ${title(target)}` : "whole tree"}`, "");
 
   for (const f of CONTEXT_FILES) {
     const heading = f === "constitution.md" ? "Constitution" : "Tech stack";
@@ -151,6 +153,7 @@ export function buildContext(p: Project, opts: ContextOptions): { text: string; 
     } catch {}
     out.push(`## ${heading}`, "", demoteHeadings(text), "");
   }
+  out.push("## Memory", "", `File: ${SSDD_DIR}/${MEMORY_FILE}`, "", memoryText(p.root) || "(empty)", "");
   out.push("## Preamble", "", demoteHeadings(stripComments(tree.preamble.join("\n")).trim()) || "(none)", "");
 
   const warnings = [...tree.diagnostics, ...s.diagnostics].filter((d) => d.level === "warning");
@@ -161,35 +164,46 @@ export function buildContext(p: Project, opts: ContextOptions): { text: string; 
   let changes: ChangeSet | null = null;
   let contextChanged: string[] = [];
   let targets: SpecNode[];
-  if (opts.mode === "implement") {
-    const base = baseline ? loadTree(gitSource(p.root, baseline.rev)) : loadTree(emptySource());
-    changes = computeChanges(base, tree);
+  if (opts.mode !== "specify") {
+    const sources = baselines.length ? baselines.map((b) => gitSource(p.root, b.commit)) : [emptySource()];
+    const [first, ...rest] = sources.map((src) => computeChanges(loadTree(src), tree));
+    changes = intersectChanges(first, rest);
     if (target) changes = filterChanges(changes, target.path);
-    if (baseline) {
+    if (opts.mode === "implement" && baselines.length) {
       contextChanged = CONTEXT_FILES.filter((f) => {
         const rel = `${SSDD_DIR}/${f}`;
         let now: string | null = null;
         try {
           now = fs.readFileSync(path.join(p.root, rel), "utf8");
         } catch {}
-        return (readAt(p.root, baseline.rev, rel) ?? null) !== now;
+        return baselines.every((b) => readAt(p.root, b.commit, rel) !== now);
       });
     }
-    targets = target ? [target] : changes.groups.map((g) => g.root.newNode).filter((n): n is SpecNode => !!n);
+    if (opts.mode === "test") targets = featuresOf(tree, changes, target);
+    else targets = target ? [target] : changes.groups.map((g) => g.root.newNode).filter((n): n is SpecNode => !!n);
   } else {
     targets = target ? [target] : tree.roots;
   }
 
-  const empty = opts.mode === "implement" && !target && !!changes && isEmpty(changes) && contextChanged.length === 0;
-  if (empty) {
-    out.push("## Changes", "", `No spec changes since v${baseline?.version ?? tree.version}.`, "");
-    return { text: out.join("\n"), empty: true };
+  if (changes && !target && isEmpty(changes) && contextChanged.length === 0) {
+    const next = opts.mode === "test" ? " Run the whole test suite." : "";
+    out.push("## Changes", "", `No spec changes since v${since}.${next}`, "");
+    return out.join("\n");
   }
 
-  const wholeTree = opts.mode === "test" && !target;
-  out.push("## Target", "");
-  if (!targets.length) out.push("(only removals: see Changes)", "");
+  const wholeTree = opts.mode === "specify" && !target;
+  if (opts.mode === "test") {
+    out.push("## Features to test", "", "Run every unit and integration test of each feature below.", "");
+    if (!targets.length) out.push("(none: only whole features were removed, see Changes)", "");
+  } else {
+    out.push("## Target", "");
+    if (!targets.length) out.push("(only removals: see Changes)", "");
+  }
   for (const t of targets) {
+    if (opts.mode === "test") {
+      out.push(`### [${t.path}] ${title(t)}`, "", ...renderSubtree(t), "");
+      continue;
+    }
     if (!wholeTree) {
       out.push(`### [${t.path}] ${title(t)}`, "");
       const anc: SpecNode[] = [];
@@ -212,7 +226,10 @@ export function buildContext(p: Project, opts: ContextOptions): { text: string; 
 
   if (changes) {
     out.push("## Changes", "");
-    if (!changes.groups.length && !changes.preamble) out.push(`No spec changes inside the target since v${baseline?.version ?? tree.version}; audit the target against the code.`, "");
+    if (!changes.groups.length && !changes.preamble) {
+      const next = opts.mode === "test" ? "run the tests of its feature" : "audit the target against the code";
+      out.push(`No spec changes inside the target since v${since}; ${next}.`, "");
+    }
     for (const g of changes.groups) {
       const r = g.root;
       const scope = r.newNode ? commitScope(r.newNode) : r.oldNode ? commitScope(r.oldNode) : "";
@@ -229,27 +246,6 @@ export function buildContext(p: Project, opts: ContextOptions): { text: string; 
         "",
       );
     }
-    const runTests = p.config.implement.runTests && !opts.noTest;
-    if (runTests) {
-      const scopes = target ? [target.path] : testScopes(changes);
-      out.push("## Test scopes", "");
-      if (!scopes.length) out.push("(none)", "");
-      const idx = indexTree(tree);
-      for (const sc of scopes) {
-        const n = idx.get(sc)!;
-        out.push(`### [${sc}] ${title(n)}`, "", ...leafLines(tree, [n], s.tags, pending, true), "");
-      }
-    }
-  } else {
-    out.push("## Tests", "");
-    const scopeNodes = target ? [target] : tree.roots;
-    const lines = leafLines(tree, scopeNodes, s.tags, pending, true);
-    out.push(...(lines.length ? lines : ["(no leaves)"]), "");
-    const orphaned = s.tags.filter((t) => t.path === "removed");
-    if (orphaned.length) {
-      out.push("Orphaned tests (delete them):", "", ...orphaned.map((t) => `- ${t.file}:${t.line} ${t.raw}`), "");
-    }
-    if (target && !isLeaf(target) && target.children.length === 0) out.push("(target has no leaves)", "");
   }
-  return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), empty: false };
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
 }

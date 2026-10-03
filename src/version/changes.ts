@@ -102,51 +102,50 @@ export function isEmpty(cs: ChangeSet): boolean {
   return cs.groups.length === 0 && !cs.preamble;
 }
 
+/** Keep the changes that pass `keep`; a group whose root is dropped is led by its first kept change. */
+function keepChanges(cs: ChangeSet, keep: (c: Change) => boolean, preamble: ChangeSet["preamble"]): ChangeSet {
+  const groups: ChangeGroup[] = [];
+  for (const g of cs.groups) {
+    const changes = g.changes.filter(keep);
+    if (changes.length) groups.push({ root: keep(g.root) ? g.root : changes[0], changes });
+  }
+  return { groups, preamble, mapping: cs.mapping };
+}
+
 /** Restrict a change set to changes inside `scope` (new paths, or old paths for removed nodes). */
 export function filterChanges(cs: ChangeSet, scope: string): ChangeSet {
   if (!scope) return cs;
-  const inScope = (c: Change) => {
-    if (c.newNode) return isInside(c.newNode.path, scope);
-    // Removed: inside when its former parent now lives inside the scope.
-    const p = c.oldNode!.parent;
-    const np = p ? cs.mapping.oldToNew.get(p)?.node : undefined;
-    return np ? isInside(np.path, scope) : false;
-  };
-  const groups: ChangeGroup[] = [];
-  for (const g of cs.groups) {
-    const changes = g.changes.filter(inScope);
-    if (!changes.length) continue;
-    groups.push({ root: inScope(g.root) ? g.root : changes[0], changes });
-  }
-  return { groups, preamble: null, mapping: cs.mapping };
-}
-
-/** Parent of each change root, deduplicated, with nested scopes dropped (5.3 step 5). */
-export function testScopes(cs: ChangeSet): string[] {
-  const scopes = new Set<string>();
-  for (const g of cs.groups) {
-    const r = g.root;
-    if (r.kind === "removed") {
-      const p = r.oldNode!.parent;
+  return keepChanges(
+    cs,
+    (c) => {
+      if (c.newNode) return isInside(c.newNode.path, scope);
+      // Removed: inside when its former parent now lives inside the scope.
+      const p = c.oldNode!.parent;
       const np = p ? cs.mapping.oldToNew.get(p)?.node : undefined;
-      if (np) scopes.add(np.path);
-    } else {
-      const n = r.newNode!;
-      scopes.add(n.parent ? n.parent.path : n.path);
-    }
-  }
-  const list = [...scopes].sort(comparePaths);
-  return list.filter((s) => !list.some((o) => o !== s && isInside(s, o)));
+      return np ? isInside(np.path, scope) : false;
+    },
+    null,
+  );
 }
 
+/**
+ * Changes pending against every baseline. After a merge of branches that each committed a version,
+ * a node one side already built is unchanged against that side's spec, so it is not pending.
+ * All change sets must be computed against the same new tree.
+ */
+export function intersectChanges(cs: ChangeSet, others: ChangeSet[]): ChangeSet {
+  if (!others.length) return cs;
+  const pendingIn = (o: ChangeSet, c: Change) =>
+    c.newNode
+      ? kindOfNew(o.mapping, c.newNode) !== "same"
+      : o.mapping.oldNodes.some((n) => n.key === c.oldNode!.key && kindOfOld(o.mapping, n) === "removed");
+  const preamble = others.every((o) => o.preamble) ? cs.preamble : null;
+  return keepChanges(cs, (c) => others.every((o) => pendingIn(o, c)), preamble);
+}
+
+/** Title and body as shown to agents, comments removed. */
 export function nodeText(n: SpecNode): string {
   const body = agentBody(n.body);
   const title = stripComments(n.title).trim();
   return body.length ? `${title}\n${body.join("\n")}` : title;
-}
-
-export function countKinds(cs: ChangeSet): Record<ChangeKind, number> {
-  const c: Record<ChangeKind, number> = { added: 0, modified: 0, moved: 0, removed: 0 };
-  for (const g of cs.groups) for (const ch of g.changes) c[ch.kind]++;
-  return c;
 }

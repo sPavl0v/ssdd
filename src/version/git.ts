@@ -1,31 +1,22 @@
 import { spawnSync } from "node:child_process";
+import { CliError } from "../config.ts";
 import { SSDD_DIR, type SpecSource } from "../spec/tree.ts";
-
-export class GitError extends Error {
-  constructor(
-    message: string,
-    public stderr = "",
-  ) {
-    super(message);
-  }
-}
 
 export interface GitResult {
   ok: boolean;
-  status: number;
   stdout: string;
   stderr: string;
 }
 
 export function gitRaw(cwd: string, args: string[], input?: string): GitResult {
   const r = spawnSync("git", args, { cwd, input, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  if (r.error) throw new GitError(`git not available: ${r.error.message}`);
-  return { ok: r.status === 0, status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+  if (r.error) throw new CliError(`git not available: ${r.error.message}`, 2);
+  return { ok: r.status === 0, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
 export function git(cwd: string, args: string[], input?: string): string {
   const r = gitRaw(cwd, args, input);
-  if (!r.ok) throw new GitError(`git ${args.join(" ")} failed: ${r.stderr.trim()}`, r.stderr);
+  if (!r.ok) throw new CliError(`git ${args.join(" ")} failed: ${r.stderr.trim()}`, 1);
   return r.stdout;
 }
 

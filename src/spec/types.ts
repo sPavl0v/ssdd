@@ -1,4 +1,4 @@
-export type Level = "error" | "warning";
+type Level = "error" | "warning";
 
 export interface Diagnostic {
   level: Level;
@@ -37,7 +37,6 @@ export interface ParsedFile {
 /** A node in the expanded spec tree. */
 export interface SpecNode {
   path: string;
-  depth: number;
   title: string;
   body: string[];
   children: SpecNode[];
@@ -45,13 +44,12 @@ export interface SpecNode {
   ref?: string;
   file: string;
   line: number;
-  /** Normalized title + body used for comparison and fingerprints. */
+  /** Normalized title + body used for comparison. */
   key: string;
 }
 
 export interface SpecTree {
   version: number;
-  format: number;
   preamble: string[];
   roots: SpecNode[];
   /** Parsed files by repo-relative path (rootspec first). */

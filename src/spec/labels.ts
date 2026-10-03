@@ -13,12 +13,6 @@ export function toLetters(n: number): string {
   return s;
 }
 
-export function fromLetters(s: string): number {
-  let n = 0;
-  for (const ch of s) n = n * 26 + (ch.charCodeAt(0) - 96);
-  return n;
-}
-
 /** Label for the child at `index` (0-based) on `level` (1-based). */
 export function labelFor(level: number, index: number): string {
   return level % 2 === 1 ? String(index + 1) : toLetters(index + 1);
@@ -38,11 +32,6 @@ export function normalizePath(input: string): string | null {
     if (isNum && Number(parts[i]) === 0) return null;
   }
   return p;
-}
-
-export function parentPath(path: string): string | null {
-  const i = path.lastIndexOf(".");
-  return i < 0 ? null : path.slice(0, i);
 }
 
 export function isInside(path: string, scope: string): boolean {

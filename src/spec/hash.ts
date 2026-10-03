@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export function stripComments(s: string): string {
   return s.replace(/<!--[\s\S]*?-->/g, "");
 }
@@ -20,10 +18,6 @@ export function nodeKey(title: string, body: string[]): string {
   }
   while (out.length && out[out.length - 1] === "") out.pop();
   return out.length ? `${t}\n${out.join("\n")}` : t;
-}
-
-export function fingerprint(key: string): string {
-  return createHash("sha256").update(key).digest("hex").slice(0, 6);
 }
 
 /** Body text as sent to agents: comments removed, edges trimmed. */

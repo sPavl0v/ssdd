@@ -1,23 +1,27 @@
+import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cli, initWithSpec, makeRepo, read, sh, spec, write } from "../helpers.ts";
 
 const BODY = "- Auth\n  - Login\n    - Email field\n  - Logout\n";
 
 describe("ssdd commit", () => {
-  it("init in an empty repo prints the first commit message; commit gives v1 and pushes ssdd-v1", async () => {
+  it("init in an empty repo prints the first commit message; commit gives v1 and pushes it, without git tags", async () => {
     const { root, remote } = makeRepo();
     const init = await cli(root, "init");
     expect(init.code).toBe(0);
     expect(init.out).toContain("chore(ssdd): initialize ssdd spec");
     expect(read(root, "ssdd/rootspec.md")).toContain("version: 0");
+    expect(read(root, "ssdd/constitution.md")).toBe(fs.readFileSync(new URL("../../templates/spec/constitution.md", import.meta.url), "utf8"));
 
     const c = await cli(root, "commit", "-m", "chore(ssdd): initialize ssdd spec");
     expect(c.code).toBe(0);
-    expect(c.out).toMatch(/ssdd v1 .* main .* tag ssdd-v1/);
+    expect(c.out).toMatch(/^ssdd v1 .* main$/m);
     expect(c.out).toContain("pushed to origin/main");
     expect(read(root, "ssdd/rootspec.md")).toContain("version: 1");
-    expect(sh(root, "git", ["log", "-1", "--format=%B"])).toContain("Ssdd-Version: 1");
-    expect(sh(remote!, "git", ["tag", "-l"]).trim()).toBe("ssdd-v1");
+    expect(sh(root, "git", ["log", "-1", "--format=%B"])).toBe("chore(ssdd): initialize ssdd spec\n\n");
+    expect(sh(remote!, "git", ["show", "main:ssdd/rootspec.md"])).toContain("version: 1");
+    expect(sh(root, "git", ["tag", "-l"])).toBe("");
+    expect(sh(remote!, "git", ["tag", "-l"])).toBe("");
   });
 
   it("bumps once per commit and reports nothing to commit without a bump", async () => {
@@ -29,7 +33,7 @@ describe("ssdd commit", () => {
     write(root, "src/a.ts", "export {};\n");
     const c = await cli(root, "commit", "-m", "feat: a");
     expect(c.out).toContain("ssdd v2");
-    expect(sh(root, "git", ["tag", "-l"]).trim().split("\n")).toEqual(["ssdd-v1", "ssdd-v2"]);
+    expect(read(root, "ssdd/rootspec.md")).toContain("version: 2");
   });
 
   it("formats spec files as part of the commit", async () => {
@@ -39,16 +43,12 @@ describe("ssdd commit", () => {
     expect(read(root, "ssdd/rootspec.md")).toContain("  - [1.b] Logout");
   });
 
-  it("takes the next number above the highest tag on the remote", async () => {
-    const { root, remote } = await initWithSpec(BODY);
-    // Another branch already pushed v5.
-    sh(root, "git", ["tag", "-a", "ssdd-v5", "-m", "x"]);
-    sh(root, "git", ["push", "-q", "origin", "ssdd-v5"]);
-    sh(root, "git", ["tag", "-d", "ssdd-v5"]);
-    write(root, "x.txt", "x\n");
+  it("increments the version in rootspec.md and changes only its number", async () => {
+    const { root } = await initWithSpec(BODY);
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("version: 1", "owner: team-a\nversion:   7"));
     const c = await cli(root, "commit", "-m", "feat: x");
-    expect(c.out).toContain("ssdd v6");
-    expect(sh(remote!, "git", ["tag", "-l"])).toContain("ssdd-v6");
+    expect(c.out).toContain("ssdd v8");
+    expect(read(root, "ssdd/rootspec.md")).toMatch(/^---\nssdd: 1\nowner: team-a\nversion:   8\n---\n/);
   });
 
   it("keeps commit and tag local without a remote and warns", async () => {
@@ -64,7 +64,7 @@ describe("ssdd commit", () => {
     await cli(root, "init");
     const c = await cli(root, "commit", "-m", "init", "--no-push");
     expect(c.out).toContain("not pushed");
-    expect(sh(remote!, "git", ["tag", "-l"]).trim()).toBe("");
+    expect(sh(remote!, "git", ["for-each-ref"])).toBe("");
   });
 
   it("refuses on detached HEAD", async () => {
@@ -104,8 +104,6 @@ describe("change detection", () => {
   it("formatting-only edits give an empty change set", async () => {
     const { root } = await initWithSpec(BODY);
     write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace(/- \[[^\]]+\] /g, "* ").replace("Email field", "Email field   <!-- todo -->"));
-    const d = await cli(root, "diff", "--json");
-    expect(JSON.parse(d.out).groups).toEqual([]);
     const ctx = await cli(root, "context", "--for", "implement");
     expect(ctx.out).toContain("No spec changes since v1.");
   });
@@ -115,36 +113,45 @@ describe("change detection", () => {
     write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("  - [1.b] Logout", "  - [1.b] Signup\n  - [1.c] Logout"));
     sh(root, "git", ["commit", "-qam", "hand edit"]);
     write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md") + "- Settings\n");
-    const d = JSON.parse((await cli(root, "diff", "--json")).out);
-    expect(d.groups.map((g: { root: string; kind: string }) => `${g.kind} ${g.root}`)).toEqual(["added 1.b", "added 2"]);
+    const ctx = (await cli(root, "context", "--for", "implement")).out;
+    expect(ctx.match(/^### Change root \[[^\]]+\] — \w+/gm)).toEqual(["### Change root [1.b] — added", "### Change root [2] — added"]);
   });
 
-  it("falls back to the Ssdd-Version trailer when tags are missing", async () => {
+  it("finds the baseline by the version line after a squash with a new message", async () => {
     const { root } = await initWithSpec(BODY);
-    sh(root, "git", ["tag", "-d", "ssdd-v1"]);
+    const v1 = sh(root, "git", ["rev-parse", "HEAD"]).trim();
     write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md") + "- Settings\n");
-    const ctx = await cli(root, "context", "--for", "implement");
-    expect(ctx.out).toMatch(/Baseline: [0-9a-f]{40}/);
-    expect(ctx.out).toContain("### Change root [2] — added");
+    await cli(root, "commit", "-m", "feat: settings", "--no-push");
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md") + "- Help\n");
+    await cli(root, "commit", "-m", "feat: help", "--no-push");
+    sh(root, "git", ["reset", "-q", "--soft", v1]);
+    sh(root, "git", ["commit", "-qm", "Squashed PR #12"]);
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md") + "- Billing\n");
+    const ctx = (await cli(root, "context", "--for", "implement")).out;
+    expect(ctx).toMatch(/- Baseline: v3 \([0-9a-f]{7}\)\n/);
+    expect(ctx.match(/^### Change root \[[^\]]+\] — \w+/gm)).toEqual(["### Change root [4] — added"]);
   });
 
-  it("history lists versions newest first with counts", async () => {
-    const { root } = await initWithSpec(BODY);
-    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("Email field", "Email fields") + "- Settings\n");
-    await cli(root, "commit", "-m", "feat: settings");
-    const h = JSON.parse((await cli(root, "history", "--json")).out);
-    expect(h.map((e: { version: number; subject: string }) => [e.version, e.subject])).toEqual([
-      [2, "feat: settings"],
-      [1, "feat: first spec"],
-    ]);
-    expect(h[0].counts).toEqual({ added: 1, modified: 1, moved: 0, removed: 0 });
-  });
+  it("after merging parallel branches, only changes made after both are pending", async () => {
+    const { root } = await initWithSpec(BODY + "- Dashboard\n  - Greeting\n- Footer\n");
+    sh(root, "git", ["checkout", "-qb", "a"]);
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("  - [2.a] Greeting\n", "  - [2.a] Greeting\n  - Chart\n"));
+    await cli(root, "commit", "-m", "feat: settings", "--no-push");
+    sh(root, "git", ["checkout", "-qb", "b", "main"]);
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("  - [1.b] Logout\n", "  - [1.b] Logout\n  - Signup\n"));
+    await cli(root, "commit", "-m", "feat: signup", "--no-push");
+    sh(root, "git", ["checkout", "-q", "a"]);
+    sh(root, "git", ["merge", "-q", "--no-edit", "b"]);
+    expect(read(root, "ssdd/rootspec.md")).toContain("version: 2\n");
 
-  it("tree --version reads an old tree from git", async () => {
-    const { root } = await initWithSpec(BODY);
-    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("- [1] Auth", "- [1] Authentication"));
-    await cli(root, "commit", "-m", "rename");
-    expect((await cli(root, "tree", "--version", "1", "--depth", "1")).out).toMatch(/\[1\] Auth$/m);
-    expect((await cli(root, "tree", "--depth", "1")).out).toContain("[1] Authentication");
+    const merged = (await cli(root, "context", "--for", "implement")).out;
+    expect(merged).toMatch(/- Baseline: v2 \([0-9a-f]{7}\) \+ v2 \([0-9a-f]{7}\)\n/);
+    expect(merged).toContain("No spec changes since v2.");
+
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md") + "- Help\n");
+    const after = (await cli(root, "context", "--for", "implement")).out;
+    expect(after.match(/^### Change root \[[^\]]+\] — \w+/gm)).toEqual(["### Change root [4] — added"]);
+    const c = await cli(root, "commit", "-m", "feat: help", "--no-push");
+    expect(c.out).toContain("ssdd v3");
   });
 });

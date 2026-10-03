@@ -7,7 +7,7 @@ import type { Diagnostic, ParsedFile, RawNode, SpecNode, SpecTree } from "./type
 
 export const SSDD_DIR = "ssdd";
 export const ROOTSPEC = `${SSDD_DIR}/rootspec.md`;
-export const MAX_DEPTH = 8;
+const MAX_DEPTH = 8;
 
 export function featureFile(feature: string): string {
   return `${SSDD_DIR}/specs/${feature}/spec.md`;
@@ -52,13 +52,12 @@ export function loadTree(source: SpecSource): SpecTree {
   const text = source.read(ROOTSPEC);
   if (text === null) {
     diagnostics.push({ level: "error", code: "no-rootspec", message: `${ROOTSPEC} not found; run ssdd init` });
-    return { version: 0, format: 1, preamble: [], roots: [], files, mounts, diagnostics };
+    return { version: 0, preamble: [], roots: [], files, mounts, diagnostics };
   }
   const root = parseSpecFile(text, ROOTSPEC);
   files.set(ROOTSPEC, root);
   diagnostics.push(...root.diagnostics);
   const version = Number(frontMatterValue(root.frontMatter, "version") ?? 0);
-  const format = Number(frontMatterValue(root.frontMatter, "ssdd") ?? 1);
   if (!Number.isInteger(version) || version < 0) {
     diagnostics.push({ level: "error", code: "bad-version", message: "version in front matter must be a non-negative integer", file: ROOTSPEC });
   }
@@ -69,7 +68,6 @@ export function loadTree(source: SpecSource): SpecTree {
       const p = parent ? `${parent.path}.${label}` : label;
       const node: SpecNode = {
         path: p,
-        depth: level,
         title: raw.title,
         body: raw.body,
         children: [],
@@ -80,7 +78,7 @@ export function loadTree(source: SpecSource): SpecTree {
         key: nodeKey(raw.title, raw.body),
       };
       if (level === MAX_DEPTH + 1) {
-        diagnostics.push({ level: "warning", code: "too-deep", message: `Depth over ${MAX_DEPTH} levels; consider ssdd split`, file, line: raw.line, path: p });
+        diagnostics.push({ level: "warning", code: "too-deep", message: `Depth over ${MAX_DEPTH} levels; consider moving a subtree to a feature file with ref:<feature>`, file, line: raw.line, path: p });
       }
       if (raw.ref) {
         const f = raw.ref;
@@ -95,7 +93,7 @@ export function loadTree(source: SpecSource): SpecTree {
             diagnostics.push({
               level: "error",
               code: "ref-missing",
-              message: `ref:${f} points to missing ${ff}; create it or use ssdd split`,
+              message: `ref:${f} points to missing ${ff}; create it`,
               file,
               line: raw.line,
               path: p,
@@ -121,7 +119,7 @@ export function loadTree(source: SpecSource): SpecTree {
     }
   }
   if (roots.length === 0) diagnostics.push({ level: "warning", code: "empty-spec", message: "spec is empty", file: ROOTSPEC });
-  return { version, format, preamble: root.preamble, roots, files, mounts, diagnostics };
+  return { version, preamble: root.preamble, roots, files, mounts, diagnostics };
 }
 
 export function* walk(nodes: SpecNode[]): Generator<SpecNode> {

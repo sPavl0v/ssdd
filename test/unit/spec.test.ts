@@ -5,7 +5,7 @@ import { parseSpecFile } from "../../src/spec/parser.ts";
 import { PathError, findNode, loadTree, type SpecSource } from "../../src/spec/tree.ts";
 
 function fmt(text: string): string {
-  return renderFile(parseSpecFile(text, "ssdd/rootspec.md"), { feature: false });
+  return renderFile(parseSpecFile(text, "ssdd/rootspec.md"), null);
 }
 
 function source(files: Record<string, string>): SpecSource {
@@ -95,9 +95,15 @@ describe("formatter", () => {
     expect(pf.diagnostics.map((d) => d.code)).toEqual(["heading-after-node"]);
   });
 
+  it("keeps fenced code in the preamble and multi-line comments in bodies", () => {
+    const text = "# App\n\n```\n- not a node\n```\n\n- [1] A\n  <!-- note\n  - not a node either -->\n  - [1.a] B\n";
+    expect(fmt(text)).toBe(text);
+    expect(parseSpecFile(text, "ssdd/rootspec.md").nodes[0].children).toHaveLength(1);
+  });
+
   it("writes the mount comment on feature files", () => {
     const pf = parseSpecFile("<!-- ssdd: mounted at [9] -->\n\n- Login\n  - Form\n", "ssdd/specs/auth/spec.md", { feature: true });
-    expect(renderFile(pf, { feature: true, mountPath: "1" })).toBe("<!-- ssdd: mounted at [1] -->\n\n- [1.a] Login\n  - [1.a.1] Form\n");
+    expect(renderFile(pf, "1")).toBe("<!-- ssdd: mounted at [1] -->\n\n- [1.a] Login\n  - [1.a.1] Form\n");
   });
 });
 
@@ -123,6 +129,9 @@ describe("tree", () => {
     ["ref cycle", { "ssdd/rootspec.md": `${FM}- A ref:x\n`, "ssdd/specs/x/spec.md": "- X ref:y\n", "ssdd/specs/y/spec.md": "- Y ref:x\n" }, "ref-cycle", "error"],
     ["ref with inline children", { "ssdd/rootspec.md": `${FM}- A ref:x\n  - Child\n`, "ssdd/specs/x/spec.md": "- X\n" }, "ref-children", "error"],
     ["empty spec", { "ssdd/rootspec.md": `${FM}# App\n` }, "empty-spec", "warning"],
+    ["ref that is not a slug", { "ssdd/rootspec.md": `${FM}- A ref:Not_A_Slug\n` }, "bad-ref", "error"],
+    ["unclosed front matter", { "ssdd/rootspec.md": "---\nversion: 1\n- A\n" }, "front-matter", "error"],
+    ["non-integer version", { "ssdd/rootspec.md": "---\nversion: 1.5\n---\n- A\n" }, "bad-version", "error"],
     ["depth over 8", { "ssdd/rootspec.md": FM + Array.from({ length: 9 }, (_, i) => `${"  ".repeat(i)}- L${i + 1}`).join("\n") + "\n" }, "too-deep", "warning"],
   ])("reports %s", (_name, files, code, level) => {
     const t = loadTree(source(files as Record<string, string>));

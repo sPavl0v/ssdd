@@ -10,4 +10,4 @@ TypeScript on Node 20+.
 - Type check: npx tsc --noEmit
 - Lint: none
 ## Testing
-- Unit: Vitest, src/**/*.test.ts
+- Unit: Vitest, src/**/*.test.ts; run: npx vitest run -t "<name filter>"

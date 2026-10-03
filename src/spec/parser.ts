@@ -10,7 +10,7 @@ const CHECKBOX = /^\[[ xX]\](?:\s+|$)/;
 const LABEL = /^\[([^\]\s]*)\](?:\s+|$)/;
 const REF = /(?:^|\s)ref:(\S+)\s*$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const MOUNT_COMMENT = /^<!--\s*ssdd: mounted at .*-->\s*$/;
+const MOUNT_COMMENT = /^<!--\s*ssdd: mounted at .*-->\s*$/;
 
 interface Frame {
   node: RawNode;
@@ -39,7 +39,7 @@ export function splitLines(text: string): string[] {
 }
 
 /** Parse a bullet's content into title, ref. Checkbox and label prefixes are dropped. */
-export function parseTitle(content: string): { title: string; ref?: string; badRef?: string } {
+function parseTitle(content: string): { title: string; ref?: string; badRef?: string } {
   let t = content.trim();
   for (let i = 0; i < 2; i++) {
     const cb = CHECKBOX.exec(t);
@@ -216,11 +216,12 @@ export function frontMatterValue(fm: string[] | null, key: string): string | und
   return undefined;
 }
 
+/** Set `key: value` in front matter, replacing only the value when the key exists. */
 export function setFrontMatterValue(fm: string[], key: string, value: string): string[] {
-  const re = new RegExp(`^${key}:`);
+  const re = new RegExp(`^(${key}:\\s*)\\S*`);
   const idx = fm.findIndex((l) => re.test(l));
   const out = fm.slice();
-  if (idx >= 0) out[idx] = `${key}: ${value}`;
+  if (idx >= 0) out[idx] = fm[idx].replace(re, (_, k) => k + value);
   else out.push(`${key}: ${value}`);
   return out;
 }

@@ -1,40 +1,28 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { VERSION } from "./generated/assets.ts";
+import { VERSION } from "./assets.ts";
 import { satisfies } from "./semver.ts";
 import { SSDD_DIR } from "./spec/tree.ts";
+import type { Diagnostic } from "./spec/types.ts";
 
 export const CONFIG_FILE = `${SSDD_DIR}/ssdd.config.json`;
-
-export const RunnerSchema = z.object({
-  name: z.string().min(1),
-  globs: z.array(z.string()).min(1),
-  tagStyle: z.enum(["name", "comment"]).default("name"),
-  command: z.string().min(1).describe("Shell command; {filter} is replaced with the test filter"),
-  junit: z.string().min(1).describe("JUnit XML file the command writes, relative to the repo root"),
-  env: z.record(z.string(), z.string()).optional(),
-});
+/** How agent commands invoke the CLI. */
+export const CLI = "npx ssdd";
+/** Agent commands are named `<prefix>-<id>`, e.g. /ssdd-implement. */
+export const COMMAND_PREFIX = "ssdd";
 
 export const ConfigSchema = z.object({
-  $schema: z.string().optional(),
-  cli: z.string().min(1).default("ssdd"),
   ssddVersion: z.string().optional(),
-  agents: z.array(z.string()).default(["claude"]),
-  commandPrefix: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).default("ssdd"),
-  implement: z.object({ runTests: z.boolean().default(true) }).prefault({}),
   git: z
     .object({
       remote: z.string().default("origin"),
       push: z.boolean().default(true),
-      tagPrefix: z.string().min(1).default("ssdd-v"),
     })
     .prefault({}),
-  test: z.object({ runners: z.array(RunnerSchema).default([]) }).prefault({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
-export type Runner = z.infer<typeof RunnerSchema>;
 
 export class CliError extends Error {
   constructor(
@@ -42,6 +30,16 @@ export class CliError extends Error {
     public exitCode = 2,
   ) {
     super(message);
+  }
+}
+
+/** Spec errors: the CLI prints each diagnostic, then the message. */
+export class SpecErrors extends CliError {
+  constructor(
+    public diagnostics: Diagnostic[],
+    message = "Spec has errors; fix them first",
+  ) {
+    super(message, 1);
   }
 }
 

@@ -1,66 +1,51 @@
-import { git, gitRaw, hasHead, remoteExists } from "./git.ts";
+import { frontMatterValue, parseSpecFile } from "../spec/parser.ts";
+import { ROOTSPEC } from "../spec/tree.ts";
+import { gitRaw, hasHead, readAt } from "./git.ts";
 
-export const TRAILER = "Ssdd-Version";
+// Only `ssdd commit` writes the `version:` line of rootspec.md, so the commits that change it are
+// the ssdd commits. They are found by content, which survives squash, rebase and reworded messages.
 
 export interface Baseline {
   version: number;
-  /** Revision to read the spec from (tag name or commit hash). */
-  rev: string;
   commit: string;
-  source: "tag" | "trailer";
 }
 
-export function tagName(prefix: string, version: number): string {
-  return `${prefix}${version}`;
+/** `git log -G` pattern for a `version: <N>` line (N ≥ 1); any N when omitted. Works as BRE and ERE. */
+function versionLine(version?: number): string {
+  return `^version: *${version ?? "[1-9][0-9]*"}[[:space:]]*$`;
 }
 
-function parseTagVersion(prefix: string, tag: string): number | null {
-  if (!tag.startsWith(prefix)) return null;
-  const n = Number(tag.slice(prefix.length));
-  return Number.isInteger(n) && n > 0 ? n : null;
+/** Commits reachable from `revs` whose diff adds or removes a version line, children before parents. */
+function versionCommits(cwd: string, revs: string[], opts: { version?: number; limit?: number } = {}): string[] {
+  const args = ["log", "--topo-order", "--full-history", "-G", versionLine(opts.version), "--format=%H"];
+  if (opts.limit) args.push(`-${opts.limit}`);
+  const r = gitRaw(cwd, [...args, ...revs, "--", ROOTSPEC]);
+  return r.ok ? r.stdout.split("\n").filter(Boolean) : [];
 }
 
-/** Nearest ssdd tag reachable from HEAD; falls back to the newest commit with an Ssdd-Version trailer (4.3). */
-export function findBaseline(cwd: string, prefix: string): Baseline | null {
-  if (!hasHead(cwd)) return null;
-  const d = gitRaw(cwd, ["describe", "--tags", "--match", `${prefix}*`, "--abbrev=0", "HEAD"]);
-  if (d.ok) {
-    const tag = d.stdout.trim();
-    const v = parseTagVersion(prefix, tag);
-    if (v !== null) {
-      const commit = git(cwd, ["rev-list", "-n", "1", tag]).trim();
-      return { version: v, rev: tag, commit, source: "tag" };
-    }
+function versionAt(cwd: string, commit: string): number {
+  const text = readAt(cwd, commit, ROOTSPEC);
+  return text === null ? 0 : Number(frontMatterValue(parseSpecFile(text, ROOTSPEC).frontMatter, "version") ?? 0);
+}
+
+/**
+ * The latest ssdd commits in HEAD's history: one on a linear history, one per side after a merge of
+ * branches that each committed a version and nothing committed since. Empty before the first.
+ */
+export function findBaselines(cwd: string): Baseline[] {
+  if (!hasHead(cwd)) return [];
+  const found: Baseline[] = [];
+  for (;;) {
+    // Topological order: the first hit has no descendant among the remaining ssdd commits.
+    const [c] = versionCommits(cwd, ["HEAD", ...found.map((b) => `^${b.commit}`)], { limit: 1 });
+    if (!c) return found;
+    found.push({ version: versionAt(cwd, c), commit: c });
   }
-  const log = gitRaw(cwd, ["log", `--format=%H%x00%(trailers:key=${TRAILER},valueonly,separator=%x2C)`, "HEAD"]);
-  if (!log.ok) return null;
-  for (const line of log.stdout.split("\n")) {
-    const [hash, val] = line.split("\0");
-    const v = Number((val ?? "").trim());
-    if (hash && val && Number.isInteger(v) && v > 0) return { version: v, rev: hash, commit: hash, source: "trailer" };
-  }
-  return null;
 }
 
-export function localTagVersions(cwd: string, prefix: string): number[] {
-  const out = gitRaw(cwd, ["tag", "-l", `${prefix}*`]).stdout;
-  return out
-    .split("\n")
-    .map((t) => parseTagVersion(prefix, t.trim()))
-    .filter((v): v is number => v !== null);
-}
-
-export function remoteTagVersions(cwd: string, prefix: string, remote: string): number[] {
-  if (!remoteExists(cwd, remote)) return [];
-  const r = gitRaw(cwd, ["ls-remote", "--tags", remote, `refs/tags/${prefix}*`]);
-  if (!r.ok) return [];
-  return r.stdout
-    .split("\n")
-    .map((l) => l.split("\t")[1]?.replace(/^refs\/tags\//, "").replace(/\^\{\}$/, ""))
-    .map((t) => (t ? parseTagVersion(prefix, t) : null))
-    .filter((v): v is number => v !== null);
-}
-
-export function tagExists(cwd: string, tag: string): boolean {
-  return gitRaw(cwd, ["rev-parse", "-q", "--verify", `refs/tags/${tag}`]).ok;
+/** Commits in HEAD's history whose rootspec.md has `version: <version>`; several after parallel branches. */
+export function commitsForVersion(cwd: string, version: number): string[] {
+  if (!hasHead(cwd)) return [];
+  // -G also matches the next commit, which removes the line; keep the ones that set it.
+  return versionCommits(cwd, ["HEAD"], { version }).filter((c) => versionAt(cwd, c) === version);
 }

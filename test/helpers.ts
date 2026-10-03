@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { run } from "../src/cli/run.ts";
 
 export function tmpDir(prefix = "ssdd-"): string {
@@ -69,5 +68,3 @@ export async function initWithSpec(body: string, opts: { remote?: boolean } = {}
   if (c.code !== 0) throw new Error(c.err + c.out);
   return repo;
 }
-
-export const FAKE_RUNNER = fileURLToPath(new URL("./fixtures/fake-runner.mjs", import.meta.url));

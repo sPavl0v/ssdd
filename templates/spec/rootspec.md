@@ -6,6 +6,11 @@ version: 0
 
 <One paragraph: what the app is and who uses it.>
 
-- [1] <Top-level feature>
-  - [1.a] <Sub-feature>
-    - [1.a.1] <Smallest checkable behavior>
+<!-- Nodes are elements (page → section → element, as deep as needed).
+Leaves are behaviors: a trigger or state change and its observable result, in
+ASD-STE100 Simplified Technical English, with exact values and no examples. -->
+
+- [1] <Page or top-level feature>
+  - [1.a] <Section or component>
+    - [1.a.1] <Element>
+      - [1.a.1.a] When <trigger>, <observable result>.

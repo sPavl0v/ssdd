@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseSpecFile } from "../../src/spec/parser.ts";
 import { loadTree } from "../../src/spec/tree.ts";
-import { changePath, computeChanges, testScopes } from "../../src/version/changes.ts";
+import { changePath, computeChanges } from "../../src/version/changes.ts";
 
 const tree = (body: string) => loadTree({ read: () => `---\nversion: 1\n---\n${body}`, listFeatures: () => [] });
 
@@ -73,14 +73,6 @@ describe("node mapping", () => {
   it("groups a changed node under a changed parent", () => {
     const after = BASE.replace("  - Login", "  - Log in").replace("Email field", "Email fields");
     expect(kinds(BASE, after)).toEqual([{ root: "modified 1.a", changes: ["modified 1.a→1.a", "modified 1.a.1→1.a.1"] }]);
-  });
-
-  it("derives deduplicated test scopes from change roots", () => {
-    const after = BASE.replace("Email field", "Email address field").replace("Password field", "Password input field").replace("  - Greeting", "  - Greeting\n  - Clock");
-    const cs = computeChanges(tree(BASE), tree(after));
-    expect(testScopes(cs)).toEqual(["1.a", "2"]);
-    const top = computeChanges(tree(BASE), tree(BASE + "- Settings\n"));
-    expect(testScopes(top)).toEqual(["3"]);
   });
 
   it("marks everything added without a baseline", () => {

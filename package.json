@@ -5,50 +5,55 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "ssdd": "bin/ssdd.cjs"
+    "ssdd": "bin/ssdd.mjs"
   },
   "files": [
     "bin",
-    "schema"
+    "dist/cli.mjs",
+    "templates"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "embed": "node scripts/embed-assets.mjs",
-    "dev": "npm run embed && bun src/cli/main.ts",
-    "typecheck": "npm run embed && tsc --noEmit",
-    "test": "npm run embed && vitest run",
-    "build": "npm run embed && bun build src/cli/main.ts --compile --minify --outfile dist/ssdd",
-    "build:all": "npm run embed && bun scripts/build-all.ts",
-    "build:wheels": "bun scripts/build-wheels.ts",
-    "schema": "npm run embed && bun scripts/gen-schema.ts",
-    "formula": "bun scripts/formula.ts"
-  },
-  "dependencies": {
-    "commander": "^15.0.0",
-    "fast-glob": "^3.3.3",
-    "fast-xml-parser": "^5.11.2",
-    "fastest-levenshtein": "^1.0.16",
-    "picocolors": "^1.1.1",
-    "zod": "^4.6.5"
+    "dev": "bun src/cli/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "bun build src/cli/main.ts --target=node --format=esm --minify --outfile dist/cli.mjs",
+    "smoke": "bash scripts/smoke.sh",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
     "bun": "^1.4.2",
-    "tsx": "^4.23.15",
+    "commander": "^15.0.0",
+    "fast-xml-parser": "^5.11.2",
+    "fastest-levenshtein": "^1.0.16",
+    "picocolors": "^1.1.1",
     "typescript": "^7.0.2",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "zod": "^4.6.5"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/<org>/ssdd"
+    "url": "git+https://github.com/sPavl0v/ssdd.git"
   },
-  "optionalDependencies": {
-    "ssdd-linux-x64": "0.1.0",
-    "ssdd-linux-arm64": "0.1.0",
-    "ssdd-darwin-x64": "0.1.0",
-    "ssdd-darwin-arm64": "0.1.0",
-    "ssdd-win32-x64": "0.1.0"
-  }
+  "homepage": "https://github.com/sPavl0v/ssdd#readme",
+  "bugs": {
+    "url": "https://github.com/sPavl0v/ssdd/issues"
+  },
+  "keywords": [
+    "spec-driven-development",
+    "sdd",
+    "ssdd",
+    "spec driven development",
+    "specs",
+    "claude skill",
+    "ai-agents",
+    "claude-code",
+    "cursor",
+    "copilot",
+    "sdd cli"
+  ]
 }
