@@ -23,8 +23,8 @@ export function openProject(cwd: string): Project {
     dir = up;
   }
   const gitRoot = repoRoot(found ?? cwd);
-  if (!gitRoot) throw new CliError("Not a git repository; run ssdd init to set one up", 2);
-  if (!found) throw new CliError(`No ${SSDD_DIR}/ folder found; run ssdd init`, 2);
+  if (!gitRoot) throw new CliError("Not a git repository", 2);
+  if (!found) throw new CliError(`No ${SSDD_DIR}/ folder found`, 2);
   const { config, errors } = loadConfig(found);
   if (errors.length) throw new CliError(errors.join("\n"), 2);
   return { root: found, config };

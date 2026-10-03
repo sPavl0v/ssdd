@@ -108,7 +108,10 @@ Request: {{ARGS}}
    touches; list the others under Suggested restructuring instead of changing them.
 6. Edit the file each node lives in (`ssdd/rootspec.md`, or `ssdd/specs/<feature>/spec.md` for
    a `ref:` mount). Keep the file's bullet style and indentation. New nodes need no label:
-   write `- <title>`; the CLI assigns labels. Never renumber labels by hand. Keep the spec free of
+   write `- <title>`; the CLI assigns labels. Never renumber labels by hand. Labels alternate by
+   level: numbers 1 to 1000 (`[1.a.234]`), then letters a to z, aa to zz (`[1.an.4]`: after z
+   come aa, ab, ac). A node holds at most 1000 children on a number level and 702 on a letter
+   level; past that, group the children under new parent nodes. Keep the spec free of
    implementation details (file names, libraries, code) unless the request is about them;
    those belong in the Tech stack. Do not edit constitution.md, techstack.md or memory.md.
 7. Ambiguous request → choose the reading most consistent with the existing spec and list it

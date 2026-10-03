@@ -46,7 +46,7 @@ describe("project and config", () => {
     const { root } = makeRepo();
     const r = await cli(root, "context", "--for", "test");
     expect(r.code).toBe(2);
-    expect(r.err).toBe("No ssdd/ folder found; run ssdd init");
+    expect(r.err).toBe("No ssdd/ folder found");
   });
 
   it.each([
@@ -113,7 +113,7 @@ describe("ssdd commit edge cases", () => {
     write(root, "ssdd/rootspec.md", "# App\n\n- Auth\n");
     const c = await cli(root, "commit", "-m", "init");
     expect(c.code).toBe(0);
-    expect(read(root, "ssdd/rootspec.md")).toBe("---\nssdd: 1\nversion: 1\n---\n# App\n\n- [1] Auth\n");
+    expect(read(root, "ssdd/rootspec.md")).toBe("---\nssdd version: 1\nversion: 1\n---\n# App\n\n- [1] Auth\n");
   });
 
   it("restores the version when git rejects the commit, so the retry does not skip a number", async () => {

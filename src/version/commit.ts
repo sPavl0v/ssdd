@@ -23,7 +23,7 @@ function setRootVersion(root: string, version: number): void {
   const pf = parseSpecFile(text, ROOTSPEC);
   const lines = splitLines(text);
   if (!pf.frontMatter) {
-    fs.writeFileSync(abs, ["---", "ssdd: 1", `version: ${version}`, "---", ...lines].join("\n") + "\n");
+    fs.writeFileSync(abs, ["---", "ssdd version: 1", `version: ${version}`, "---", ...lines].join("\n") + "\n");
     return;
   }
   const fm = setFrontMatterValue(pf.frontMatter, "version", String(version));
@@ -35,8 +35,8 @@ export function commit(p: Project, message: string, opts: { push?: boolean } = {
   const cwd = p.root;
   if (!message.trim()) throw new CliError("Commit message is empty", 2);
   const branch = currentBranch(cwd);
-  if (!branch) throw new CliError("Detached HEAD: check out a branch before ssdd commit", 1);
-  if (mergeInProgress(cwd)) throw new CliError("A merge, rebase or cherry-pick is in progress: finish it before ssdd commit", 1);
+  if (!branch) throw new CliError("Detached HEAD: check out a branch before committing", 1);
+  if (mergeInProgress(cwd)) throw new CliError("A merge, rebase or cherry-pick is in progress: finish it before committing", 1);
 
   const s = sync(p);
   const errors = [...s.tree.diagnostics, ...s.diagnostics].filter((d) => d.level === "error");

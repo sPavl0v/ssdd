@@ -55,7 +55,7 @@ export function read(root: string, rel: string): string {
 }
 
 export function spec(version: number, body: string, preamble = "# App\n\nTest app.\n"): string {
-  return `---\nssdd: 1\nversion: ${version}\n---\n${preamble}\n${body.replace(/^\n/, "")}`;
+  return `---\nssdd version: 1\nversion: ${version}\n---\n${preamble}\n${body.replace(/^\n/, "")}`;
 }
 
 /** Initialize ssdd, write a spec and commit it as v1 (no push unless a remote exists). */

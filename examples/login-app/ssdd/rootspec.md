@@ -1,5 +1,5 @@
 ---
-ssdd: 1
+ssdd version: 1
 version: 0
 ---
 # Login app

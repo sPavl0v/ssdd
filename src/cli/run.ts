@@ -3,7 +3,7 @@ import path from "node:path";
 import { Command, CommanderError, Option } from "commander";
 import pc from "picocolors";
 import { adapter } from "../agents/adapters.ts";
-import { CLI, CliError, COMMAND_PREFIX, SpecErrors } from "../config.ts";
+import { CliError, COMMAND_PREFIX, SpecErrors } from "../config.ts";
 import { buildContext } from "../context/bundle.ts";
 import { VERSION } from "../assets.ts";
 import { FIRST_COMMIT_MESSAGE, init } from "../init.ts";
@@ -57,7 +57,7 @@ export async function run(argv: string[], io: IO): Promise<number> {
       let root = repoRoot(io.cwd);
       if (!root) {
         const ok = o.yes || (await io.confirm(`${io.cwd} is not a git repository. Run git init here?`));
-        if (!ok) throw new CliError("Not a git repository; run git init first (or ssdd init --yes)", 2);
+        if (!ok) throw new CliError("Not a git repository; run git init first", 2);
         git(io.cwd, ["init", "-q"]);
         root = repoRoot(io.cwd)!;
       }
@@ -74,7 +74,7 @@ export async function run(argv: string[], io: IO): Promise<number> {
       io.out(FIRST_COMMIT_MESSAGE);
       io.out("```");
       io.out("");
-      io.out(`Run /${COMMAND_PREFIX}-commit with this message, as is or edited (or: ${CLI} commit -m "${FIRST_COMMIT_MESSAGE}").`);
+      io.out(`Run /${COMMAND_PREFIX}-commit with this message, as is or edited.`);
     });
 
   program

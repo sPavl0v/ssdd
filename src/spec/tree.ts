@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { nodeKey } from "./hash.ts";
-import { labelFor } from "./labels.ts";
+import { labelFor, maxSiblings } from "./labels.ts";
 import { frontMatterValue, parseSpecFile } from "./parser.ts";
 import type { Diagnostic, ParsedFile, RawNode, SpecNode, SpecTree } from "./types.ts";
 
@@ -51,7 +51,7 @@ export function loadTree(source: SpecSource): SpecTree {
   const mounts = new Map<string, string>();
   const text = source.read(ROOTSPEC);
   if (text === null) {
-    diagnostics.push({ level: "error", code: "no-rootspec", message: `${ROOTSPEC} not found; run ssdd init` });
+    diagnostics.push({ level: "error", code: "no-rootspec", message: `${ROOTSPEC} not found` });
     return { version: 0, preamble: [], roots: [], files, mounts, diagnostics };
   }
   const root = parseSpecFile(text, ROOTSPEC);
@@ -62,8 +62,20 @@ export function loadTree(source: SpecSource): SpecTree {
     diagnostics.push({ level: "error", code: "bad-version", message: "version in front matter must be a non-negative integer", file: ROOTSPEC });
   }
 
-  const build = (raws: RawNode[], parent: SpecNode | null, level: number, file: string, chain: string[]): SpecNode[] =>
-    raws.map((raw, idx) => {
+  const build = (raws: RawNode[], parent: SpecNode | null, level: number, file: string, chain: string[]): SpecNode[] => {
+    const max = maxSiblings(level);
+    if (raws.length > max) {
+      const where = parent ? `[${parent.path}] has` : "The spec has";
+      diagnostics.push({
+        level: "error",
+        code: "too-many-siblings",
+        message: `${where} ${raws.length} children; the most is ${max} (${labelFor(level, 0)} to ${labelFor(level, max - 1)}). Group them under new parent nodes`,
+        file,
+        line: raws[max].line,
+        path: parent?.path,
+      });
+    }
+    return raws.map((raw, idx) => {
       const label = labelFor(level, idx);
       const p = parent ? `${parent.path}.${label}` : label;
       const node: SpecNode = {
@@ -111,6 +123,7 @@ export function loadTree(source: SpecSource): SpecTree {
       }
       return node;
     });
+  };
 
   const roots = build(root.nodes, null, 1, ROOTSPEC, []);
   for (const f of source.listFeatures()) {

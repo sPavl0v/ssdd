@@ -45,10 +45,10 @@ describe("ssdd commit", () => {
 
   it("increments the version in rootspec.md and changes only its number", async () => {
     const { root } = await initWithSpec(BODY);
-    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("version: 1", "owner: team-a\nversion:   7"));
+    write(root, "ssdd/rootspec.md", read(root, "ssdd/rootspec.md").replace("\nversion: 1", "\nowner: team-a\nversion:   7"));
     const c = await cli(root, "commit", "-m", "feat: x");
     expect(c.out).toContain("ssdd v8");
-    expect(read(root, "ssdd/rootspec.md")).toMatch(/^---\nssdd: 1\nowner: team-a\nversion:   8\n---\n/);
+    expect(read(root, "ssdd/rootspec.md")).toMatch(/^---\nssdd version: 1\nowner: team-a\nversion:   8\n---\n/);
   });
 
   it("keeps commit and tag local without a remote and warns", async () => {

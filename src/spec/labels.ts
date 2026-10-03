@@ -2,6 +2,23 @@
 
 export const PATH_GRAMMAR = /^\d+(\.([a-z]+|\d+))*$/;
 
+/** Most siblings a number level holds: labels 1 to 1000. */
+export const MAX_NUMBER = 1000;
+/** Most siblings a letter level holds: labels a to z, then aa to zz (26 + 26 × 26). */
+export const MAX_LETTERS = 702;
+
+/** Most children a node on `level` (1-based) can hold. */
+export function maxSiblings(level: number): number {
+  return level % 2 === 1 ? MAX_NUMBER : MAX_LETTERS;
+}
+
+/** Inverse of toLetters: a → 1, z → 26, aa → 27. */
+export function fromLetters(s: string): number {
+  let n = 0;
+  for (const c of s) n = n * 26 + (c.charCodeAt(0) - 96);
+  return n;
+}
+
 /** Spreadsheet-style letters: 1 → a, 26 → z, 27 → aa. */
 export function toLetters(n: number): string {
   let s = "";
@@ -29,7 +46,8 @@ export function normalizePath(input: string): string | null {
   for (let i = 0; i < parts.length; i++) {
     const isNum = /^\d+$/.test(parts[i]);
     if (isNum !== (i % 2 === 0)) return null;
-    if (isNum && Number(parts[i]) === 0) return null;
+    const n = isNum ? Number(parts[i]) : fromLetters(parts[i]);
+    if (n < 1 || n > maxSiblings(i + 1)) return null;
   }
   return p;
 }

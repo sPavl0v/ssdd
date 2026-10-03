@@ -1,6 +1,6 @@
 # ssdd — Simple Spec-Driven Development
 
-ssdd is designed to keep one live spec which reflects the current state of an application. Spec is represented as a nested list of application features. Each leaf is one behavior, written in [ASD-STE100](https://www.asd-ste100.org) Simplified Technical English with exact values, so it has only one interpretation. Example:
+ssdd is designed to keep one spec which reflects the current state of an application. Spec is represented as a tree(nodes and leafs) of application features and logic. Each node usually represent a structural element and each leaf - its behavior. Example:
 
 ```markdown
 - [1] Login page
@@ -35,19 +35,32 @@ ssdd is designed to keep one live spec which reflects the current state of an ap
       - [1.a.6.d] When the POST /login response has a status other than 200 and 401, or the request closes without a response, the Error message shows "Login failed. Try again.".
 ```
 
+## Workflow
+
+Workflow consists on 5 simple steps:
+
+`npx ssdd init`(once) -> `/ssdd-specify` -> `/ssdd-implement` -> `/ssdd-test` -> `/ssdd-commit`
+
+1. `ssdd init` creates rootspec.md, constitution.md, techstack.md, memory.md and ssdd.config.json in root/ssdd folder + create 4 following skills in .claude/ folder.
+2. `/ssdd-specify <what should be changed>` - update the spec for you. Uses [ASD-STE100](https://www.asd-ste100.org/) to make descriptions clean and easy to interpret for agents.
+3. `/ssdd-implement` runs the implementation based on what changed in spec from last commit. Uses git diff to identify changes. Creates a unit test(s) for each leaf + integration tests for each top-level feature.
+4. `/ssdd-test` runs all unit and integration tests.
+5. `/ssdd-commit <message>` increment a rootspec version and commit changes
+
+Supported agent: Claude Code (installed as skills in `.claude/skills/<name>/SKILL.md`).
+
+
 ## Install
 
-Requires Node.js >=20. Run it with npx:
+Requires Node.js >=20 and git. Run it with npx:
 
 ```sh
 npx ssdd init
 ```
 
-The agent commands call the CLI as `npx ssdd`.
-
 ## Files
 
-`ssdd init` creates these files. It never overwrites a file that already exists. Commit them all.
+`ssdd init` creates following structure at `root`. It never overwrites a file that already exists.
 
 ```
 ssdd/
@@ -59,13 +72,13 @@ ssdd/
   ssdd.config.json            CLI settings
 ```
 
-- **`ssdd/rootspec.md`** is the spec. It has three parts:
-  - Front matter with `ssdd: 1` (the file format) and `version: <N>`. Only `ssdd commit` changes the version (see [Versions](#versions)).
+- **`ssdd/rootspec.md`** - main spec which describes application. It has three parts:
+  - ssdd and rootspec version.
   - A preamble: a heading with the app name and one paragraph that says what the app is and who uses it. Agents read it as context for every node.
   - The tree of nodes (see [Spec format](#spec-format)).
-- **`ssdd/specs/<feature>/spec.md`** holds the subtree of one feature when the root spec gets too long. A node in `rootspec.md` with the title `<title> ref:<feature>` mounts that file at its place. The node has no children of its own, and each feature file is mounted once. `<feature>` is a kebab-case slug.
-- **`ssdd/constitution.md`** has the rules that every change must follow: the YAGNI, DRY and KISS principles and the commit message format (Conventional Commits). Agents stop and report when a spec node conflicts with it. Edit it to add your own rules. `/ssdd-specify` never edits it.
-- **`ssdd/techstack.md`** says how the project is built: runtime and languages, approved and banned libraries, data and storage, project structure, the build, type check, lint and dev commands, and the test frameworks and commands. `/ssdd-implement` follows it and runs its build, type check and lint commands. Fill it in after `ssdd init`. A change to this file or to `constitution.md` does not cause a codebase-wide refactor: `/ssdd-implement` lists the affected areas as follow-ups.
+- **`ssdd/specs/<feature>/spec.md`** (optional) - additional sub-spec for a top-level feature. Use it if your rootspec became too large. create a reference in rootspec.md by: `ref:<feature>`
+- **`ssdd/constitution.md`** has the rules that every change must follow. Agents stop and report when a spec node conflicts with it. Edit it to add your own rules. `/ssdd-specify` never edits it.
+- **`ssdd/techstack.md`** - technical details of the projects.
 - **`ssdd/memory.md`** holds facts the agents looked up because `constitution.md` and `techstack.md` do not state them, such as how to run the tests (see [Memory](#memory)). Agents write it; you can edit or clear it.
 - **`ssdd/ssdd.config.json`** has the CLI settings:
 
@@ -77,32 +90,14 @@ ssdd/
 
 - **`.claude/skills/ssdd-<name>/SKILL.md`** are the four agent commands for Claude Code: `ssdd-specify`, `ssdd-implement`, `ssdd-test` and `ssdd-commit`.
 
-## Workflow
-
-1. `ssdd init` writes `ssdd/rootspec.md`, `constitution.md`, `techstack.md`, `memory.md` and `ssdd.config.json`, installs the slash commands and prints the first commit message.
-2. `/ssdd-commit <message>` sets the version to 1, commits and pushes.
-3. Describe what you want with `/ssdd-specify <request>` (e.g. `/ssdd-specify [1.a.2] on focus make outline blue`), or edit `ssdd/rootspec.md` and `ssdd/specs/<feature>/spec.md` yourself.
-4. `/ssdd-implement` diffs the spec against the last ssdd commit. It builds added nodes, updates changed ones and removes deleted ones, writes or updates their tests, then prints a commit message. It does not run tests.
-5. `/ssdd-test` runs all unit and integration tests of each top-level feature that has changes.
-6. `/ssdd-commit <that message>`.
-
-The four agent commands are `/ssdd-specify <request>`, `/ssdd-implement [path]`, `/ssdd-test [path]` and `/ssdd-commit <message>`. Supported agent: Claude Code (installed as skills in `.claude/skills/<name>/SKILL.md`).
 
 ## Spec format
 
 - A node is a bullet (`-`, `*`, `+`). Any following lines at the node's indentation that are not bullets form its body.
-- Labels come from position, with numbers and letters alternating by level (`1.a.3.b`). Never write them by hand: every `context` and `commit` run fills them in.
-- Structure: a node is an element of the product, nested as the product nests (page → section → element); a leaf is one behavior of its parent element. The example at the top shows the structure.
+- Labels come from position, with numbers and letters alternating by level (`1.a.3.b`). Number levels go from 1 to 1000 (`1.a.234`); letter levels go from a to z, then aa to zz (`1.an.4`), so a node has at most 1000 or 702 children. 
 - Leaves are written in ASD-STE100 Simplified Technical English, in one of these forms: `When <trigger>, <result>.`, `While <state>, <result>.`, `The <element> <is|shows> <value>.` or `The <value> is valid when <rule>.` Every value is exact (text in quotes, colors as hex, durations in ms, patterns as regular expressions). Leaves contain no examples, no vague words and no references to other nodes by label. `/ssdd-specify` follows these rules for everything it writes.
 - A node whose title ends in `ref:<feature>` mounts `ssdd/specs/<feature>/spec.md` at that point.
 - HTML comments are notes for humans and are ignored by change detection. Bullet style, indentation and labels are ignored too.
-- The spec holds no status. Status comes from your test runs.
-
-## Versions
-
-`ssdd/rootspec.md` starts with `version: <N>`. `ssdd commit` is the only thing that changes it: it adds one to `<N>`, leaves the rest of the line alone, and commits. ssdd creates no git tags.
-
-The baseline for `/ssdd-implement` is the last commit that changed that line, found by content, so it survives squash merges, rebases and reworded messages. Spec edits committed by hand after it still count as changes. When two branches each ran `ssdd commit` and are merged, both commits are baselines: a change is pending only if neither branch built it. If both branches reached different versions, the `version:` line conflicts in the merge; keep either number and the next commit continues from it.
 
 ## Memory
 
@@ -134,7 +129,7 @@ Exit codes: 0 means OK, 1 means failures (spec errors, a rejected push), 2 means
 
 ## Example
 
-`examples/login-app` is a small app specced with a login checklist. Every leaf has a Vitest unit test named after it, and each top-level feature has an integration test. To try it, copy it into a fresh git repo, run `npm install`, then run `/ssdd-test` in your agent, or `npm test` yourself.
+`examples/login-app` is a small UI app written with ssdd.
 
 ## Development
 
@@ -145,16 +140,3 @@ npm run typecheck
 npm run build       # bundle into dist/cli.mjs (Node, no runtime dependencies)
 npm run smoke       # npm pack, then run init/commit/context/commit through npx
 ```
-
-## Release
-
-Releases go to npm from CI. Bump the version and push the tag:
-
-```sh
-npm version patch        # or minor / major
-git push --follow-tags
-```
-
-The release workflow checks that the tag matches `package.json`, runs the smoke test, type check and tests, then publishes with provenance and creates a GitHub release. It needs an `NPM_TOKEN` repository secret.
-
-Layout: `src/spec` (parser, formatter, tree, labels, hashes), `src/version` (git, baseline, mapping, change set, sync, commit), `src/agents` (adapters), `src/context` (bundle), `src/cli` (commands). Templates live in `templates/` (agent skills in `templates/skills/ssdd-<name>.md`) and ship in the npm package; the CLI reads them at runtime (`src/assets.ts`).

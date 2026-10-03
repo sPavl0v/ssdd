@@ -21,7 +21,7 @@ git remote add origin ../remote.git
 ssdd --version
 ssdd init
 ssdd commit -m "chore(ssdd): initialize ssdd spec"
-printf -- '---\nssdd: 1\nversion: 1\n---\n# Login\n\n- Login form\n  - Shows email field\n' > ssdd/rootspec.md
+printf -- '---\nssdd version: 1\nversion: 1\n---\n# Login\n\n- Login form\n  - Shows email field\n' > ssdd/rootspec.md
 ssdd context --for implement > /dev/null
 ssdd commit -m "feat(login): login form"
 git -C ../remote.git show main:ssdd/rootspec.md | grep -qx 'version: 2'

@@ -18,7 +18,7 @@ function source(files: Record<string, string>): SpecSource {
   };
 }
 
-const FM = "---\nssdd: 1\nversion: 3\n---\n";
+const FM = "---\nssdd version: 1\nversion: 3\n---\n";
 
 describe("labels", () => {
   it("uses spreadsheet letters after z", () => {
@@ -30,6 +30,10 @@ describe("labels", () => {
     expect(normalizePath("1.1")).toBeNull();
     expect(normalizePath("a")).toBeNull();
     expect(normalizePath("1.a.b")).toBeNull();
+    expect(normalizePath("[1.an.4]")).toBe("1.an.4");
+    expect(normalizePath("1000.zz.1000")).toBe("1000.zz.1000");
+    expect(normalizePath("1001")).toBeNull();
+    expect(normalizePath("1.aaa")).toBeNull();
   });
 });
 
@@ -138,6 +142,22 @@ describe("tree", () => {
     expect(t.diagnostics.find((d) => d.code === code)).toMatchObject({ level });
   });
 
+  it("labels letters up to zz and numbers up to 1000, then reports too many siblings", () => {
+    const kids = (n: number, indent: string) => Array.from({ length: n }, (_, i) => `${indent}- N${i}\n`).join("");
+    const ok = loadTree(source({ "ssdd/rootspec.md": `${FM}- A\n${kids(702, "  ")}` }));
+    expect(ok.diagnostics.filter((d) => d.level === "error")).toEqual([]);
+    expect(ok.roots[0].children[39].path).toBe("1.an");
+    expect(ok.roots[0].children[701].path).toBe("1.zz");
+    const over = loadTree(source({ "ssdd/rootspec.md": `${FM}- A\n${kids(703, "  ")}` }));
+    expect(over.diagnostics.find((d) => d.code === "too-many-siblings")?.message).toBe(
+      "[1] has 703 children; the most is 702 (a to zz). Group them under new parent nodes",
+    );
+    const top = loadTree(source({ "ssdd/rootspec.md": `${FM}${kids(1001, "")}` }));
+    expect(top.roots[999].path).toBe("1000");
+    expect(top.diagnostics.find((d) => d.code === "too-many-siblings")?.message).toBe(
+      "The spec has 1001 children; the most is 1000 (1 to 1000). Group them under new parent nodes",
+    );
+  });
   it("explains a missing path with the nearest ancestor", () => {
     const t = loadTree(source({ "ssdd/rootspec.md": `${FM}- A\n  - B\n  - C\n` }));
     expect(() => findNode(t, "1.c", 4)).toThrow(new PathError("No node 1.c in v4. 1 has children 1.a to 1.b."));
